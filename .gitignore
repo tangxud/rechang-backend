@@ -1,0 +1,13 @@
+target/
+
+# IDE（Eclipse / IDEA）— 仅忽略，本地文件不删
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.factorypath
+
+logs/
+*.log
+.DS_Store
