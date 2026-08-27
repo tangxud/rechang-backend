@@ -1,6 +1,8 @@
 package com.rechang.api.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.rechang.api.client.OcrClient;
+import com.rechang.api.client.WechatLoginClient;
 import com.rechang.api.dto.LoginDTO;
 import com.rechang.api.dto.PhoneBindDTO;
 import com.rechang.api.dto.RealnameDTO;
@@ -8,8 +10,6 @@ import com.rechang.api.entity.Attendee;
 import com.rechang.api.entity.User;
 import com.rechang.api.mapper.AttendeeMapper;
 import com.rechang.api.mapper.UserMapper;
-import com.rechang.api.mock.OcrMock;
-import com.rechang.api.mock.WechatLoginMock;
 import com.rechang.api.vo.LoginVO;
 import com.rechang.api.vo.RealnameResultVO;
 import com.rechang.api.vo.UserProfileVO;
@@ -31,11 +31,11 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final AttendeeMapper attendeeMapper;
-    private final WechatLoginMock wechatMock;
-    private final OcrMock ocrMock;
+    private final WechatLoginClient wechatClient;
+    private final OcrClient ocrClient;
 
     public LoginVO login(LoginDTO dto) {
-        Map<String, Object> session = wechatMock.code2session(dto.getCode());
+        Map<String, Object> session = wechatClient.code2session(dto.getCode());
         String openid = (String) session.get("openid");
         String unionid = (String) session.get("unionid");
 
@@ -70,7 +70,7 @@ public class AuthService {
         if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
             phone = dto.getPhone();
         } else {
-            phone = wechatMock.decryptPhone(dto.getEncryptedData(), dto.getIv());
+            phone = wechatClient.decryptPhone(dto.getEncryptedData(), dto.getIv());
         }
         user.setPhone(phone);
         userMapper.updateById(user);
@@ -80,7 +80,7 @@ public class AuthService {
     public RealnameResultVO submitRealname(RealnameDTO dto, Long userId) {
         User user = getUserById(userId);
 
-        Map<String, String> ocrResult = ocrMock.recognizeIdCard(dto.getIdCardFrontUrl(), dto.getIdCardBackUrl());
+        Map<String, String> ocrResult = ocrClient.recognizeIdCard(dto.getIdCardFrontUrl(), dto.getIdCardBackUrl());
         String realName = ocrResult.get("name");
         String idCardNo = ocrResult.get("id_card_no");
 

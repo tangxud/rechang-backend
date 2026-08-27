@@ -12,9 +12,24 @@ import java.util.Map;
 
 public class JwtUtils {
 
-    private static final String SECRET = "rechang-secret-key-for-jwt-token-2026-must-be-at-least-32-chars";
-    private static final SecretKey KEY = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    /**
+     * 内置默认密钥仅供本地开发与单元测试兜底；
+     * 各环境实际密钥经 application-{profile}.yml 的 jwt.secret 由 AppSecretConfig 注入，
+     * 生产环境无默认可用（缺失即启动失败）。密钥规范见 docs/design/environment_config.md。
+     */
+    private static final String DEFAULT_SECRET = "rechang-secret-key-for-jwt-token-2026-must-be-at-least-32-chars";
     private static final long EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000L;
+
+    private static volatile SecretKey key = Keys.hmacShaKeyFor(DEFAULT_SECRET.getBytes(StandardCharsets.UTF_8));
+
+    public static void initSecret(String secret) {
+        if (secret != null && !secret.isBlank()) {
+            if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+                throw new IllegalArgumentException("jwt.secret 至少需要 32 字节（HS256 要求）");
+            }
+            key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        }
+    }
 
     public static String generateToken(Long userId, String openid) {
         Map<String, Object> claims = new HashMap<>();
@@ -25,13 +40,13 @@ public class JwtUtils {
                 .subject(String.valueOf(userId))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
-                .signWith(KEY)
+                .signWith(key)
                 .compact();
     }
 
     public static Claims parseToken(String token) {
         return Jwts.parser()
-                .verifyWith(KEY)
+                .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

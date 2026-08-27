@@ -1,0 +1,39 @@
+# ===== 生产环境 =====
+# 所有敏感项必须由部署系统从 KMS/配置中心读取后注入环境变量（见 environment_spec.md §8.6），
+# 此处不提供任何默认值，缺失即启动失败。
+
+spring:
+  datasource:
+    url: ${MYSQL_URL}
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD}
+
+jwt:
+  secret: ${JWT_SECRET}             # >= 32 字节强随机串，季度轮换
+qr:
+  hmac-secret: ${QR_HMAC_SECRET}    # 与闸机侧约定一致，轮换走 ticket_hmac_key:vN 双活窗口
+
+logging:
+  level:
+    root: warn
+    com.rechang: info
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# TODO 迭代预留：接入 Elasticsearch / RabbitMQ 后在此补充 spring.elasticsearch、spring.rabbitmq 配置段
+# TODO 迭代预留：微信支付真实商户参数、KMS 托管密钥接入

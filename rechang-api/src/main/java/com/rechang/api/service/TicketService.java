@@ -20,9 +20,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TicketService {
 
-    private static final String HMAC_SECRET = "rechang-qr-code-hmac-secret-key-2026";
+    /** 检票二维码 HMAC 密钥：dev 默认值仅供本地开发与单测，各环境经 qr.hmac-secret 由 AppSecretConfig 注入 */
+    private static volatile String hmacSecret = "rechang-qr-code-hmac-secret-key-2026";
     private static final long QR_EXPIRE_SECONDS = 30;
     private static final long QR_VALID_WINDOW_MS = 5L * 60 * 1000;
+
+    public static void initHmacSecret(String secret) {
+        if (secret != null && !secret.isBlank()) {
+            hmacSecret = secret;
+        }
+    }
 
     private final TicketMapper ticketMapper;
     private final PerformanceMapper performanceMapper;
@@ -286,7 +293,7 @@ public class TicketService {
     private String hmacSha256(String content) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec keySpec = new SecretKeySpec(HMAC_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            SecretKeySpec keySpec = new SecretKeySpec(hmacSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(keySpec);
             byte[] hash = mac.doFinal(content.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hash);
