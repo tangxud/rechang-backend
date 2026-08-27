@@ -11,7 +11,7 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
     default-property-inclusion: non_null
-    property-naming-strategy: SNAKE_CASE
+    # API JSON 属性统一 camelCase（与 API 契约一致）；DB 列名 snake_case 由 MyBatis-Plus 下划线映射承担
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
