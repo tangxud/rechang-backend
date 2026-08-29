@@ -29,6 +29,12 @@ jwt:
 qr:
   hmac-secret: ${QR_HMAC_SECRET:}
 
+# 微信小程序凭据：dev 走 WechatLoginMock 无需提供；
+# test/prod 必须以环境变量提供（对应 profile 已去除空值占位），缺失即启动失败
+wechat:
+  appid: ${WECHAT_APPID:}
+  secret: ${WECHAT_SECRET:}
+
 management:
   endpoints:
     web:

@@ -43,6 +43,7 @@ class AuthServiceTest {
     @Mock AttendeeMapper attendeeMapper;
     @Mock WechatLoginClient wechatClient;
     @Mock OcrClient ocrClient;
+    @Mock WechatSessionKeyStore wechatSessionKeyStore;
     @InjectMocks AuthService authService;
 
     @BeforeEach
@@ -82,6 +83,7 @@ class AuthServiceTest {
         assertThat(vo.isNeedRealname()).isTrue();
         assertThat(vo.getUserId()).isEqualTo(cap.getValue().getId());
         assertThat(JwtUtils.getUserId(vo.getToken())).isEqualTo(vo.getUserId());
+        verify(wechatSessionKeyStore).save(cap.getValue().getId(), "k");
     }
 
     @Test
@@ -113,20 +115,34 @@ class AuthServiceTest {
 
         String masked = authService.bindPhone(dto, Fixtures.USER_A);
         assertThat(masked).isEqualTo("139****0000");
-        verify(wechatClient, never()).decryptPhone(any(), any());
+        verify(wechatClient, never()).decryptPhone(any(), any(), any());
     }
 
     @Test
-    @DisplayName("无显式手机号走微信解密（mock 返回 13888888888）")
+    @DisplayName("无显式手机号走微信解密（取 Redis 中的 session_key 传给解密通道）")
     void bindPhoneDecryptFallback() {
         User u = user(Fixtures.USER_A, null, "UNVERIFIED");
         when(userMapper.selectById(Fixtures.USER_A)).thenReturn(u);
-        when(wechatClient.decryptPhone("enc", "iv")).thenReturn("13888888888");
+        when(wechatSessionKeyStore.load(Fixtures.USER_A)).thenReturn("sk");
+        when(wechatClient.decryptPhone("sk", "enc", "iv")).thenReturn("13888888888");
         PhoneBindDTO dto = new PhoneBindDTO();
         dto.setEncryptedData("enc");
         dto.setIv("iv");
 
         assertThat(authService.bindPhone(dto, Fixtures.USER_A)).isEqualTo("138****8888");
+    }
+
+    @Test
+    @DisplayName("登录未返回 session_key（老用户场景）时以 null 透传，由 store 端忽略不写 Redis")
+    void loginWithoutSessionKeySkipsStore() {
+        when(wechatClient.code2session("wx-code")).thenReturn(Map.of("openid", "openid-1", "unionid", ""));
+        when(userMapper.selectOne(any())).thenReturn(user(Fixtures.USER_A, "13888888888", "VERIFIED"));
+
+        LoginDTO dto = new LoginDTO();
+        dto.setCode("wx-code");
+        authService.login(dto);
+
+        verify(wechatSessionKeyStore).save(Fixtures.USER_A, null);
     }
 
     /* ================= 实名认证 ================= */

@@ -33,6 +33,7 @@ public class AuthService {
     private final AttendeeMapper attendeeMapper;
     private final WechatLoginClient wechatClient;
     private final OcrClient ocrClient;
+    private final WechatSessionKeyStore wechatSessionKeyStore;
 
     public LoginVO login(LoginDTO dto) {
         Map<String, Object> session = wechatClient.code2session(dto.getCode());
@@ -51,6 +52,7 @@ public class AuthService {
             userMapper.insert(user);
             isNewUser = true;
         }
+        wechatSessionKeyStore.save(user.getId(), (String) session.get("session_key"));
 
         String token = JwtUtils.generateToken(user.getId(), openid);
 
@@ -70,7 +72,8 @@ public class AuthService {
         if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
             phone = dto.getPhone();
         } else {
-            phone = wechatClient.decryptPhone(dto.getEncryptedData(), dto.getIv());
+            phone = wechatClient.decryptPhone(wechatSessionKeyStore.load(userId),
+                    dto.getEncryptedData(), dto.getIv());
         }
         user.setPhone(phone);
         userMapper.updateById(user);

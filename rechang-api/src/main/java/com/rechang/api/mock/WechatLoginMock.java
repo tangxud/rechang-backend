@@ -28,7 +28,7 @@ public class WechatLoginMock implements WechatLoginClient {
     }
 
     @Override
-    public String decryptPhone(String encryptedData, String iv) {
+    public String decryptPhone(String sessionKey, String encryptedData, String iv) {
         log.info("[MOCK] WeChat decryptPhone (returning fixed phone)");
         return "13888888888";
     }

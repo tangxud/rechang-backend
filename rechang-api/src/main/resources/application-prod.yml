@@ -19,6 +19,9 @@ jwt:
   secret: ${JWT_SECRET}             # >= 32 字节强随机串，季度轮换
 qr:
   hmac-secret: ${QR_HMAC_SECRET}    # 与闸机侧约定一致，轮换走 ticket_hmac_key:vN 双活窗口
+wechat:
+  appid: ${WECHAT_APPID}
+  secret: ${WECHAT_SECRET}          # 小程序后台生成，泄露即重置；轮换仅需重启生效
 
 logging:
   level:

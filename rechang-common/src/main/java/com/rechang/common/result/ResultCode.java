@@ -45,7 +45,9 @@ public enum ResultCode {
     QR_SIGNATURE_MISMATCH(1031, "二维码签名校验失败", Severity.WARN),
     FACE_VERIFY_FAILED(1032, "人脸核验未通过", Severity.WARN),
     TICKET_ALREADY_USED(1033, "该票已核销", Severity.WARN),
-    TICKET_ID_CARD_USED(1034, "该身份证已核销入场，一证一票", Severity.WARN);
+    TICKET_ID_CARD_USED(1034, "该身份证已核销入场，一证一票", Severity.WARN),
+    WECHAT_AUTH_FAILED(1035, "微信登录失败", Severity.WARN),
+    WECHAT_DECRYPT_FAILED(1036, "微信数据解密失败", Severity.WARN);
 
     private final int code;
     private final String message;

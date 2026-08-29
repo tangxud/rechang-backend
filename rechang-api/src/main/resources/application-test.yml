@@ -18,6 +18,9 @@ jwt:
   secret: ${JWT_SECRET}
 qr:
   hmac-secret: ${QR_HMAC_SECRET}
+wechat:
+  appid: ${WECHAT_APPID}
+  secret: ${WECHAT_SECRET}
 
 logging:
   level:
