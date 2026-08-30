@@ -11,3 +11,7 @@ target/
 logs/
 *.log
 .DS_Store
+
+# 本地联调凭据（不提交）
+.env.local
+.env*.local
