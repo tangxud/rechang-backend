@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -128,5 +129,54 @@ class InvoiceServiceTest {
     void orderInvoiceEmpty() {
         when(invoiceMapper.selectOne(any())).thenReturn(null);
         assertThat(invoiceService.getOrderInvoice(Fixtures.ORDER_ID, Fixtures.USER_A)).isNull();
+    }
+
+    /* ================= voidInvoice（全额退款联动，票 #30003） ================= */
+
+    @Test
+    @DisplayName("voidInvoice：ISSUED 发票置 VOIDED 并更新")
+    void voidInvoiceMarksVoided() {
+        Invoice inv = new Invoice();
+        inv.setId(5L);
+        inv.setOrderId(Fixtures.ORDER_ID);
+        inv.setStatus("ISSUED");
+        when(invoiceMapper.selectOne(any())).thenReturn(inv);
+
+        invoiceService.voidInvoice(Fixtures.ORDER_ID);
+
+        ArgumentCaptor<Invoice> cap = ArgumentCaptor.forClass(Invoice.class);
+        verify(invoiceMapper).updateById(cap.capture());
+        assertThat(cap.getValue().getStatus()).isEqualTo("VOIDED");
+        assertThat(cap.getValue().getUpdateTime()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("voidInvoice：无有效发票（未开过/已作废）时幂等静默，不触发更新")
+    void voidInvoiceIdempotent() {
+        when(invoiceMapper.selectOne(any())).thenReturn(null);
+
+        invoiceService.voidInvoice(Fixtures.ORDER_ID);
+
+        verify(invoiceMapper, never()).updateById(any(Invoice.class));
+    }
+
+    /* ================= 作废后重开（uk_order 降级普通索引，防重走应用层） ================= */
+
+    @Test
+    @DisplayName("作废后重开：仅剩 VOIDED 历史（防重查询排除 VOIDED → 返回空）可再次开票成功")
+    void reopenAfterVoid() {
+        var order = Fixtures.order(Fixtures.ORDER_ID, Fixtures.USER_A, Fixtures.PERF_ID, "ISSUED");
+        order.setTotalAmount(38000);
+        when(orderMapper.selectOne(any())).thenReturn(order);
+        // 真实 DB 语义：该订单只剩 VOIDED 行时，ne(VOIDED) 查询返回空
+        when(invoiceMapper.selectOne(any())).thenReturn(null);
+
+        InvoiceVO vo = invoiceService.applyInvoice(Fixtures.ORDER_ID, dto("PERSONAL", null), Fixtures.USER_A);
+
+        assertThat(vo.getStatus()).isEqualTo("ISSUED");
+        ArgumentCaptor<Invoice> cap = ArgumentCaptor.forClass(Invoice.class);
+        verify(invoiceMapper).insert(cap.capture());
+        assertThat(cap.getValue().getOrderId()).isEqualTo(Fixtures.ORDER_ID);
+        assertThat(cap.getValue().getAmount()).isEqualTo(38000);
     }
 }

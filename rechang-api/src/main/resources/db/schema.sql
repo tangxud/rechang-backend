@@ -293,7 +293,8 @@ CREATE TABLE invoice (
     create_time  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_order (order_id),
+    -- order_id 为普通索引：发票作废(VOIDED)后同订单允许重开，「一单一有效发票」由应用层防重保证（票 #30003）
+    INDEX ix_order (order_id),
     UNIQUE KEY uk_invoice_no (invoice_no),
     INDEX ix_user (user_id),
     INDEX ix_status (status)

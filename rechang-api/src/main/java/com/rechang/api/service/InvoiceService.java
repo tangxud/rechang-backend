@@ -126,6 +126,26 @@ public class InvoiceService {
         return invoice.getInvoiceUrl();
     }
 
+    /**
+     * 全额退款联动作废发票（PRD §8.9）：ISSUED → VOIDED。
+     * 幂等：无有效发票（未开过/已作废）时静默返回。
+     * 作废后同订单可重新开票：invoice.order_id 已降级为普通索引 ix_order，
+     * 「一单一有效发票」由 applyInvoice 的应用层防重（查询排除 VOIDED）保证。
+     * 由 RefundService 在订单聚合为 REFUNDED 时调用，与退款同事务。
+     */
+    public void voidInvoice(Long orderId) {
+        Invoice invoice = invoiceMapper.selectOne(new LambdaQueryWrapper<Invoice>()
+                .eq(Invoice::getOrderId, orderId)
+                .eq(Invoice::getStatus, "ISSUED")
+                .last("LIMIT 1"));
+        if (invoice == null) {
+            return;
+        }
+        invoice.setStatus("VOIDED");
+        invoice.setUpdateTime(new Date());
+        invoiceMapper.updateById(invoice);
+    }
+
     private InvoiceVO toVO(Invoice invoice, Map<Long, OrderEntity> orderMap, Map<Long, Performance> perfMap) {
         InvoiceVO vo = new InvoiceVO();
         vo.setId(invoice.getId());

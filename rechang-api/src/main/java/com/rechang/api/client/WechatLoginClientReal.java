@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rechang.common.exception.BusinessException;
 import com.rechang.common.result.ResultCode;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -38,6 +39,7 @@ public class WechatLoginClientReal implements WechatLoginClient {
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Autowired
     public WechatLoginClientReal(@Value("${wechat.appid:}") String appid,
                                  @Value("${wechat.secret:}") String secret,
                                  RestClient.Builder restClientBuilder) {

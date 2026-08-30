@@ -53,6 +53,7 @@ class RefundServiceTest {
     @Mock PerformanceMapper performanceMapper;
     @Mock SeatMapper seatMapper;
     @Mock RedisTemplate<String, Object> redisTemplate;
+    @Mock InvoiceService invoiceService;
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
     @InjectMocks RefundService refundService;
@@ -238,12 +239,15 @@ class RefundServiceTest {
         assertThat(orderCap.getValue().getRefundedAmount()).isEqualTo(30400);
         assertThat(orderCap.getValue().getRefundedAt()).isNull();
 
+        // 部分退票不联动作废发票
+        verify(invoiceService, never()).voidInvoice(any());
+
         assertThat(vo.getStatus()).isEqualTo("SUCCESS");
         assertThat(vo.getSeatLabel()).isEqualTo("站票"); // seatId=null
     }
 
     @Test
-    @DisplayName("最后一张票退掉：聚合为 REFUNDED 并写 refunded_at")
+    @DisplayName("最后一张票退掉：聚合为 REFUNDED 并写 refunded_at，且联动作废发票")
     void refundTicket_lastTicketAggregatesToRefunded() {
         when(ticketMapper.selectCount(any())).thenReturn(0L);
         perf.setStartAt(daysFromNow(8));
@@ -254,6 +258,7 @@ class RefundServiceTest {
         verify(orderMapper).updateById(cap.capture());
         assertThat(cap.getValue().getStatus()).isEqualTo("REFUNDED");
         assertThat(cap.getValue().getRefundedAt()).isNotNull();
+        verify(invoiceService).voidInvoice(Fixtures.ORDER_ID);
     }
 
     @Test

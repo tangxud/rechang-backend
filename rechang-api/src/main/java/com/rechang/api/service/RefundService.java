@@ -49,6 +49,7 @@ public class RefundService {
     private final SeatMapper seatMapper;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final InvoiceService invoiceService;
 
     public RefundPreviewVO previewRefund(Long orderId, Long ticketId, Long userId) {
         OrderEntity order = getOrder(orderId, userId);
@@ -267,6 +268,8 @@ public class RefundService {
         if (activeCount == 0) {
             order.setStatus("REFUNDED");
             order.setRefundedAt(now);
+            // 全额退款联动作废发票（PRD §8.9），幂等；作废后同订单可重开
+            invoiceService.voidInvoice(orderId);
         }
     }
 
