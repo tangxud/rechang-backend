@@ -151,7 +151,9 @@ public class TransferService {
         originalOrder.setStatus("TRANSFERRED");
         originalOrder.setTransferredAt(now);
         originalOrder.setUpdateTime(now);
-        orderMapper.updateById(originalOrder);
+        if (orderMapper.updateById(originalOrder) == 0) {
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，转赠失败");
+        }
 
         // 2. 原 ticket → TRANSFERRED（继续占用 A 的限购额度）
         ticketMapper.update(null,

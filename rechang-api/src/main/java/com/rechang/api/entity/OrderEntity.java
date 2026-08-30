@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
 import java.util.Date;
@@ -43,6 +44,8 @@ public class OrderEntity {
 
     private String status;
 
+    /** 乐观锁版本号：配合 OptimisticLockerInnerInterceptor，updateById 附带 version 条件并自增；0 行更新即并发冲突 */
+    @Version
     private Integer version;
 
     @TableField("completed_at")

@@ -89,6 +89,8 @@ class ReviewServiceTest {
 
         lenient().when(performanceMapper.selectById(Fixtures.PERF_ID)).thenReturn(perf);
         lenient().when(orderMapper.selectOne(any())).thenReturn(attendedOrder);
+        // 乐观锁冲突检查默认放行（冲突语义由专项用例验证）
+        lenient().when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(1);
         lenient().when(reviewMapper.selectOne(any())).thenReturn(null);
         lenient().when(summaryMapper.selectById(any(String.class))).thenReturn(null);
         lenient().when(valueOps.setIfAbsent(any(String.class), any(), any(Long.class), any())).thenReturn(true);

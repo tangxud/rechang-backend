@@ -59,6 +59,8 @@ class TicketServiceTest {
     void setUp() {
         ticket = Fixtures.ticket(Fixtures.TICKET_ID, Fixtures.ORDER_ID, Fixtures.PERF_ID, "USABLE");
         lenient().when(ticketMapper.selectById(Fixtures.TICKET_ID)).thenReturn(ticket);
+        // 乐观锁冲突检查默认放行（冲突语义由专项用例验证）
+        lenient().when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(1);
     }
 
     /* ---- 测试内复现服务的 HMAC-SHA256 签名 ---- */
@@ -200,7 +202,7 @@ class TicketServiceTest {
         assertThat(cap.getValue().getFaceVerified()).isEqualTo(1);
         assertThat(cap.getValue().getUsedAt()).isNotNull();
 
-        // 订单流转同样通过新建 update 实体落库（不改原查询对象）
+        // 订单流转更新完整加载的实体（乐观锁 version 条件生效，票 #30004）
         ArgumentCaptor<OrderEntity> orderCap = ArgumentCaptor.forClass(OrderEntity.class);
         verify(orderMapper).updateById(orderCap.capture());
         assertThat(orderCap.getValue().getId()).isEqualTo(Fixtures.ORDER_ID);

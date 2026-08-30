@@ -75,6 +75,8 @@ class RefundServiceTest {
         lenient().when(performanceMapper.selectById(Fixtures.PERF_ID)).thenReturn(perf);
         // 默认：订单下仍有活跃票（部分退票场景）
         lenient().when(ticketMapper.selectCount(any())).thenReturn(1L);
+        // 乐观锁冲突检查默认放行（冲突语义由专项用例验证）
+        lenient().when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(1);
     }
 
     /* ================= 时间分档矩阵（经 previewRefund 触发 calculateStage） ================= */

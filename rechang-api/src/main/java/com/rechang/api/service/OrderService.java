@@ -342,7 +342,14 @@ public class OrderService {
         order.setPaidAt(new Date());
         order.setPayChannel("WECHAT");
         order.setUpdateTime(new Date());
-        orderMapper.updateById(order);
+        if (orderMapper.updateById(order) == 0) {
+            // 乐观锁冲突（如并发取消/重复支付）：以最新状态为准
+            OrderEntity latest = orderMapper.selectById(orderId);
+            if (latest != null && "ISSUED".equals(latest.getStatus())) {
+                return buildMockPayParams(); // 已被并发请求支付成功，幂等返回
+            }
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，无法完成支付");
+        }
 
         List<Ticket> tickets = ticketMapper.selectList(
                 new LambdaQueryWrapper<Ticket>().eq(Ticket::getOrderId, orderId));
@@ -374,7 +381,10 @@ public class OrderService {
         order.setCancelledAt(new Date());
         order.setCancelReason("USER");
         order.setUpdateTime(new Date());
-        orderMapper.updateById(order);
+        if (orderMapper.updateById(order) == 0) {
+            // 乐观锁冲突：并发支付已赢（或状态已变），绝不能继续删除已支付订单的票
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，无法取消");
+        }
 
         List<Ticket> tickets = ticketMapper.selectList(
                 new LambdaQueryWrapper<Ticket>().eq(Ticket::getOrderId, orderId));

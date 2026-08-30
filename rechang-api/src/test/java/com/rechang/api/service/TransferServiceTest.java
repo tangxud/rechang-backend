@@ -82,6 +82,8 @@ class TransferServiceTest {
         ticket.setAttendeeIdCardHash("hash-a");
         lenient().when(ticketMapper.selectById(Fixtures.TICKET_ID)).thenReturn(ticket);
         lenient().when(performanceMapper.selectById(Fixtures.PERF_ID)).thenReturn(Fixtures.performance("ON_SALE"));
+        // 乐观锁冲突检查默认放行（冲突语义由专项用例验证）
+        lenient().when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(1);
     }
 
     /* ================= startTransfer ================= */

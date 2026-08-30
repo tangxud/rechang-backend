@@ -202,12 +202,18 @@ public class TicketService {
         if (orderId != null) {
             OrderEntity order = orderMapper.selectById(orderId);
             if (order != null && !"ATTENDED".equals(order.getStatus()) && !"REVIEWED".equals(order.getStatus())) {
-                OrderEntity orderUpdate = new OrderEntity();
-                orderUpdate.setId(orderId);
-                orderUpdate.setStatus("ATTENDED");
-                orderUpdate.setCompletedAt(usedAt);
-                orderUpdate.setUpdateTime(usedAt);
-                orderMapper.updateById(orderUpdate);
+                // 更新完整加载的实体，保证乐观锁 version 条件生效（部分字段更新 version=null 会绕过校验）
+                order.setStatus("ATTENDED");
+                order.setCompletedAt(usedAt);
+                order.setUpdateTime(usedAt);
+                if (orderMapper.updateById(order) == 0) {
+                    // 并发核销同订单另一张票可能已完成同向流转，重查确认；状态仍不对才报冲突
+                    OrderEntity latest = orderMapper.selectById(orderId);
+                    if (latest == null
+                            || (!"ATTENDED".equals(latest.getStatus()) && !"REVIEWED".equals(latest.getStatus()))) {
+                        throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，请重试核销");
+                    }
+                }
             }
         }
 

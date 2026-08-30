@@ -82,6 +82,8 @@ class OrderServiceTest {
             inv.getArgument(0, OrderEntity.class).setId(999L);
             return 1;
         });
+        // 乐观锁冲突检查默认放行（冲突语义由专项用例验证）
+        lenient().when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(1);
         lenient().when(ticketMapper.insert(any(Ticket.class))).thenReturn(1);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(seatMapper.selectBatchIds(any())).thenAnswer(inv -> {
@@ -321,6 +323,50 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.cancelOrder(Fixtures.ORDER_ID, Fixtures.USER_A))
                 .matches(e -> ((BusinessException) e).getCode() == 1012);
         verify(ticketMapper, never()).delete(any());
+    }
+
+    /* ================= 乐观锁并发冲突（票 #30004） ================= */
+
+    @Test
+    @DisplayName("支付并发冲突：订单已被并发取消 → 抛 ORDER_STATUS_ERROR，票不动")
+    void payConflictCancelled() {
+        OrderEntity order = pendingOrder();
+        OrderEntity cancelled = Fixtures.order(Fixtures.ORDER_ID, Fixtures.USER_A, Fixtures.PERF_ID, "CANCELLED");
+        when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(0);
+        when(orderMapper.selectById(Fixtures.ORDER_ID)).thenReturn(order, cancelled);
+
+        assertThatThrownBy(() -> orderService.pay(Fixtures.ORDER_ID, Fixtures.USER_A))
+                .matches(e -> ((BusinessException) e).getCode() == 1012)
+                .hasMessageContaining("无法完成支付");
+        verify(ticketMapper, never()).update(any(Ticket.class), any());
+        verify(redisTemplate, never()).delete(anyString());
+    }
+
+    @Test
+    @DisplayName("支付并发冲突：另一请求已支付成功 → 幂等返回支付参数，不重复出票")
+    void payConflictIdempotentSuccess() {
+        OrderEntity order = pendingOrder();
+        OrderEntity issued = Fixtures.order(Fixtures.ORDER_ID, Fixtures.USER_A, Fixtures.PERF_ID, "ISSUED");
+        when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(0);
+        when(orderMapper.selectById(Fixtures.ORDER_ID)).thenReturn(order, issued);
+
+        PayParamsVO params = orderService.pay(Fixtures.ORDER_ID, Fixtures.USER_A);
+
+        assertThat(params.getPackageStr()).startsWith("prepay_id=wx");
+        verify(ticketMapper, never()).update(any(Ticket.class), any());
+    }
+
+    @Test
+    @DisplayName("取消并发冲突：支付已生效 → 抛 ORDER_STATUS_ERROR，绝不删除已支付订单的票")
+    void cancelConflictAfterPaid() {
+        pendingOrder();
+        when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> orderService.cancelOrder(Fixtures.ORDER_ID, Fixtures.USER_A))
+                .matches(e -> ((BusinessException) e).getCode() == 1012)
+                .hasMessageContaining("无法取消");
+        verify(ticketMapper, never()).delete(any());
+        verify(redisTemplate, never()).delete(anyString());
     }
 
     @Test

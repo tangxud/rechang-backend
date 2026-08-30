@@ -120,7 +120,10 @@ public class RefundService {
         order.setRefundedAmount(newRefunded);
         updateOrderStatusIfAllRefunded(order, orderId, now);
         order.setUpdateTime(now);
-        orderMapper.updateById(order);
+        if (orderMapper.updateById(order) == 0) {
+            // RR 快照下事务内重试无效，冲突即回滚由用户重试（并发退同一订单的另一张票）
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，请重试退款");
+        }
 
         if (ticket.getSeatId() != null) {
             redisTemplate.delete("seat:lock:" + order.getPerformanceId() + ":" + ticket.getSeatId());
@@ -170,7 +173,9 @@ public class RefundService {
         order.setRefundedAmount(newRefunded);
         updateOrderStatusIfAllRefunded(order, orderId, now);
         order.setUpdateTime(now);
-        orderMapper.updateById(order);
+        if (orderMapper.updateById(order) == 0) {
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，请重试退款");
+        }
 
         return toRefundRecordVO(record, resolveSeatLabel(ticket.getSeatId()), perf.getPerfName());
     }

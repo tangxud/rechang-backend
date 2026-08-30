@@ -188,7 +188,9 @@ public class ReviewService {
         order.setStatus("REVIEWED");
         order.setReviewedAt(now);
         order.setUpdateTime(now);
-        orderMapper.updateById(order);
+        if (orderMapper.updateById(order) == 0) {
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，评价失败");
+        }
 
         return review.getId();
     }
