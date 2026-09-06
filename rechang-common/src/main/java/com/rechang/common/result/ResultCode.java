@@ -47,7 +47,8 @@ public enum ResultCode {
     TICKET_ALREADY_USED(1033, "该票已核销", Severity.WARN),
     TICKET_ID_CARD_USED(1034, "该身份证已核销入场，一证一票", Severity.WARN),
     WECHAT_AUTH_FAILED(1035, "微信登录失败", Severity.WARN),
-    WECHAT_DECRYPT_FAILED(1036, "微信数据解密失败", Severity.WARN);
+    WECHAT_DECRYPT_FAILED(1036, "微信数据解密失败", Severity.WARN),
+    WECHAT_PAY_FAILED(1037, "微信支付失败", Severity.WARN);
 
     private final int code;
     private final String message;

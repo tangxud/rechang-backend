@@ -13,6 +13,7 @@ import com.rechang.api.mapper.PerformancePriceZoneMapper;
 import com.rechang.api.mapper.PerformanceReviewMapper;
 import com.rechang.api.mapper.SeatMapper;
 import com.rechang.api.mapper.TicketMapper;
+import com.rechang.api.mapper.UserMapper;
 import com.rechang.api.mapper.VenueMapper;
 import com.rechang.api.support.Fixtures;
 import com.rechang.api.vo.PayParamsVO;
@@ -61,6 +62,8 @@ class OrderServiceTest {
     @Mock PerformanceReviewMapper performanceReviewMapper;
     @Mock RedisTemplate<String, Object> redisTemplate;
     @Mock ValueOperations<String, Object> valueOps;
+    @Mock UserMapper userMapper;
+    @Mock com.rechang.api.client.PaymentGateway paymentGateway;
     @InjectMocks OrderService orderService;
 
     private Performance perf;
@@ -84,6 +87,9 @@ class OrderServiceTest {
         });
         // 乐观锁冲突检查默认放行（冲突语义由专项用例验证）
         lenient().when(orderMapper.updateById(any(OrderEntity.class))).thenReturn(1);
+        // 支付网关默认 Mock 语义：返回参数 + 支付即成功（真实网关行为由专项用例验证）
+        lenient().when(paymentGateway.createPayParams(any(OrderEntity.class), any())).thenReturn(mockPayParams());
+        lenient().when(paymentGateway.settlesImmediately()).thenReturn(true);
         lenient().when(ticketMapper.insert(any(Ticket.class))).thenReturn(1);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(seatMapper.selectBatchIds(any())).thenAnswer(inv -> {
@@ -267,6 +273,16 @@ class OrderServiceTest {
         return o;
     }
 
+    private com.rechang.api.vo.PayParamsVO mockPayParams() {
+        com.rechang.api.vo.PayParamsVO vo = new com.rechang.api.vo.PayParamsVO();
+        vo.setTimeStamp("1700000000");
+        vo.setNonceStr("nonce");
+        vo.setPackageStr("prepay_id=wx123");
+        vo.setSignType("RSA");
+        vo.setPaySign("MOCK_SIGNATURE");
+        return vo;
+    }
+
     @Test
     @DisplayName("仅 PENDING_PAY 可支付")
     void payOnlyPending() {
@@ -293,7 +309,8 @@ class OrderServiceTest {
 
         verify(ticketMapper).update(any(Ticket.class), any());
         verify(redisTemplate).delete(LOCK_KEY);
-        assertThat(params.getTimeStamp()).isEqualTo(String.valueOf(System.currentTimeMillis() / 1000));
+        // 参数内容属网关职责（动态时间戳/签名见 WechatPayClientRealTest），此处只验推进副作用与参数回传
+        assertThat(params).isNotNull();
         assertThat(params.getSignType()).isEqualTo("RSA");
         assertThat(params.getPackageStr()).startsWith("prepay_id=wx");
     }
@@ -367,6 +384,20 @@ class OrderServiceTest {
                 .hasMessageContaining("无法取消");
         verify(ticketMapper, never()).delete(any());
         verify(redisTemplate, never()).delete(anyString());
+    }
+
+    @Test
+    @DisplayName("真实网关路径：settlesImmediately=false 仅返回参数，订单保持 PENDING_PAY 待回调推进")
+    void payWithRealGatewayDefersAdvance() {
+        OrderEntity order = pendingOrder();
+        when(paymentGateway.settlesImmediately()).thenReturn(false);
+
+        PayParamsVO params = orderService.pay(Fixtures.ORDER_ID, Fixtures.USER_A);
+
+        assertThat(params.getPackageStr()).isEqualTo("prepay_id=wx123");
+        assertThat(order.getStatus()).isEqualTo("PENDING_PAY");
+        verify(orderMapper, never()).updateById(any(OrderEntity.class));
+        verify(ticketMapper, never()).update(any(Ticket.class), any());
     }
 
     @Test

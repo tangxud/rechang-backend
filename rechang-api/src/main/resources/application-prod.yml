@@ -22,6 +22,9 @@ qr:
 wechat:
   appid: ${WECHAT_APPID}
   secret: ${WECHAT_SECRET}          # 小程序后台生成，泄露即重置；轮换仅需重启生效
+# 微信支付：prod 必须配置商户号（缺失启动失败，禁止 Mock 收单）；其余凭据由 WechatPayConfig 构造时 fail-fast
+wechat-pay:
+  mchid: ${WECHAT_PAY_MCHID}
 
 logging:
   level:

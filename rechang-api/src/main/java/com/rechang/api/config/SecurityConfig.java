@@ -33,6 +33,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/home").permitAll()
                 .requestMatchers("/api/search/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
+                // 微信支付回调：免 JWT，安全由 PaymentGateway 回调验签承担
+                .requestMatchers(HttpMethod.POST, "/api/pay/wechat/notify").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

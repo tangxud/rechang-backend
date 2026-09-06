@@ -35,6 +35,16 @@ wechat:
   appid: ${WECHAT_APPID:}
   secret: ${WECHAT_SECRET:}
 
+# 微信支付（票 #30005）：配置 wechat-pay.mchid 即启用 v3 真实网关（其余凭据必须齐全，缺失启动失败）；
+# 未配置时回落 Mock 网关（支付即成功）——本地/无商户号场景；prod 缺失直接启动失败，禁止生产 Mock 收单
+wechat-pay:
+  mchid: ${WECHAT_PAY_MCHID:}
+  api-v3-key: ${WECHAT_PAY_API_V3_KEY:}
+  merchant-serial-no: ${WECHAT_PAY_MERCHANT_SERIAL_NO:}
+  merchant-private-key: ${WECHAT_PAY_MERCHANT_PRIVATE_KEY:}
+  platform-public-key: ${WECHAT_PAY_PLATFORM_PUBLIC_KEY:}
+  notify-url: ${WECHAT_PAY_NOTIFY_URL:}
+
 management:
   endpoints:
     web:

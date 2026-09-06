@@ -9,6 +9,7 @@ import com.rechang.api.entity.PerformancePriceZone;
 import com.rechang.api.entity.PerformanceReview;
 import com.rechang.api.entity.Seat;
 import com.rechang.api.entity.Ticket;
+import com.rechang.api.entity.User;
 import com.rechang.api.entity.Venue;
 import com.rechang.api.mapper.AttendeeMapper;
 import com.rechang.api.mapper.OrderMapper;
@@ -61,6 +62,8 @@ public class OrderService {
     private final AttendeeMapper attendeeMapper;
     private final PerformanceReviewMapper performanceReviewMapper;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final com.rechang.api.mapper.UserMapper userMapper;
+    private final com.rechang.api.client.PaymentGateway paymentGateway;
 
     @Transactional
     public OrderVO createOrder(CreateOrderDTO dto, Long userId) {
@@ -338,33 +341,49 @@ public class OrderService {
             throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "仅待支付订单可发起支付");
         }
 
+        User user = userMapper.selectById(userId);
+        PayParamsVO params = paymentGateway.createPayParams(order, user != null ? user.getOpenid() : null);
+        // Mock 网关"支付即成功"同步推进；真实网关返回参数后由支付回调推进（WechatPayNotifyService）
+        if (paymentGateway.settlesImmediately()) {
+            advanceOrderToIssued(order, "WECHAT");
+        }
+        return params;
+    }
+
+    /**
+     * 支付成功推进：ISSUED + 出票（整单票 PENDING→USABLE）+ 释放座位锁。
+     * 乐观锁冲突时以最新状态为准：已支付态幂等放行，其他状态（如并发取消）抛错。
+     * pay()（Mock 即时成功）与支付回调（WechatPayNotifyService）两条路径共用。
+     */
+    public void advanceOrderToIssued(OrderEntity order, String channel) {
+        if (PAID_ORDER_STATUSES.contains(order.getStatus())) {
+            return; // 已支付态幂等：重复回调/重复支付直接短路，不产生写库
+        }
         order.setStatus("ISSUED");
         order.setPaidAt(new Date());
-        order.setPayChannel("WECHAT");
+        order.setPayChannel(channel);
         order.setUpdateTime(new Date());
         if (orderMapper.updateById(order) == 0) {
             // 乐观锁冲突（如并发取消/重复支付）：以最新状态为准
-            OrderEntity latest = orderMapper.selectById(orderId);
-            if (latest != null && "ISSUED".equals(latest.getStatus())) {
-                return buildMockPayParams(); // 已被并发请求支付成功，幂等返回
+            OrderEntity latest = orderMapper.selectById(order.getId());
+            if (latest != null && PAID_ORDER_STATUSES.contains(latest.getStatus())) {
+                return; // 已被并发请求推进成功，幂等
             }
             throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态已变化，无法完成支付");
         }
 
-        List<Ticket> tickets = ticketMapper.selectList(
-                new LambdaQueryWrapper<Ticket>().eq(Ticket::getOrderId, orderId));
-
         Ticket updateTicket = new Ticket();
         updateTicket.setStatus("USABLE");
-        ticketMapper.update(updateTicket, new LambdaQueryWrapper<Ticket>().eq(Ticket::getOrderId, orderId));
+        ticketMapper.update(updateTicket,
+                new LambdaQueryWrapper<Ticket>().eq(Ticket::getOrderId, order.getId()));
 
+        List<Ticket> tickets = ticketMapper.selectList(
+                new LambdaQueryWrapper<Ticket>().eq(Ticket::getOrderId, order.getId()));
         for (Ticket t : tickets) {
             if (t.getSeatId() != null) {
                 redisTemplate.delete(buildLockKey(order.getPerformanceId(), t.getSeatId()));
             }
         }
-
-        return buildMockPayParams();
     }
 
     @Transactional
@@ -496,15 +515,5 @@ public class OrderService {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
         int random = new Random().nextInt(9000) + 1000;
         return "RC" + sdf.format(new Date()) + random;
-    }
-
-    private PayParamsVO buildMockPayParams() {
-        PayParamsVO vo = new PayParamsVO();
-        vo.setTimeStamp(String.valueOf(System.currentTimeMillis() / 1000));
-        vo.setNonceStr(UUID.randomUUID().toString().replace("-", ""));
-        vo.setPackageStr("prepay_id=wx" + System.currentTimeMillis());
-        vo.setSignType("RSA");
-        vo.setPaySign("MOCK_SIGNATURE_" + System.currentTimeMillis());
-        return vo;
     }
 }
