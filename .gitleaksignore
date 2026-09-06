@@ -1,0 +1,5 @@
+# gitleaks 基线：历史误报排除清单（fingerprint = 引入提交:文件:规则:行）
+# 两处均为单元测试中的明文假常量（非真实凭据）
+1b978c137fd5e7e91ce86b0d0373d4e6ed9b10a5:rechang-api/src/test/java/com/rechang/api/client/WechatPayClientRealTest.java:generic-api-key:42
+c9f570afe465ead0257d39a92cc9ab3801d0931a:rechang-common/src/test/java/com/rechang/common/utils/JwtUtilsTest.java:generic-api-key:27
+c9f570afe465ead0257d39a92cc9ab3801d0931a:rechang-common/src/test/java/com/rechang/common/utils/JwtUtilsTest.java:generic-api-key:28
